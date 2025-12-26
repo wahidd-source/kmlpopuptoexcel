@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>KML → CSV</title>
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  background: #020617;
+  color: #e5e7eb;
+  padding: 40px;
+}
+h2 { margin-bottom: 6px; }
+p { color: #94a3b8; }
+input, button {
+  font-size: 16px;
+  padding: 10px;
+}
+button {
+  background: #22c55e;
+  border: none;
+  cursor: pointer;
+  margin-left: 10px;
+}
+pre {
+  margin-top: 20px;
+  background: #020617;
+  border: 1px solid #1e293b;
+  padding: 15px;
+  white-space: pre-wrap;
+}
+</style>
+</head>
+
+<body>
+
+<h2>KML → CSV By Wahid</h2>
+<p>Convert KML ke excel.</p>
+
+<input type="file" id="file" accept=".kml">
+<button id="btn">Convert</button>
+
+<pre id="log"></pre>
+
+<script>
+let outputFileName = "output.csv";
+
+document.getElementById("btn").addEventListener("click", () => {
+  const fileInput = document.getElementById("file");
+  const file = fileInput.files[0];
+
+  if (!file) {
+    alert("Masukin file KML dulu.");
+    return;
+  }
+
+  outputFileName = file.name.replace(/\.kml$/i, ".csv");
+
+  const reader = new FileReader();
+  reader.onload = e => parseKML(e.target.result);
+  reader.readAsText(file);
+});
+
+function parseKML(text) {
+  const xml = new DOMParser().parseFromString(text, "text/xml");
+  const placemarks = xml.getElementsByTagName("Placemark");
+
+  if (!placemarks.length) {
+    log("Tidak ada Placemark.");
+    return;
+  }
+
+  let headers = [];
+  let rows = [];
+
+  for (let i = 0; i < placemarks.length; i++) {
+    const pm = placemarks[i];
+    const row = {};
+
+    const simpleData = pm.getElementsByTagName("SimpleData");
+    let localHeaders = [];
+
+    for (let j = 0; j < simpleData.length; j++) {
+      const key = simpleData[j].getAttribute("name");
+      const val = simpleData[j].textContent.trim();
+
+      localHeaders.push(key);
+      row[key] = val;
+    }
+
+    if (headers.length === 0) headers = localHeaders;
+    rows.push(row);
+  }
+
+  if (!headers.length) {
+    log("ExtendedData / SimpleData tidak ditemukan.");
+    return;
+  }
+
+  exportCSV(headers, rows);
+}
+
+function exportCSV(headers, rows) {
+  let csv = headers.join(",") + "\n";
+
+  for (let i = 0; i < rows.length; i++) {
+    csv += headers.map(h => {
+      const v = rows[i][h] || "";
+      return `"${v.replace(/"/g, '""')}"`;
+    }).join(",") + "\n";
+  }
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = outputFileName;
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+  log(
+    "Selesai.\n" +
+    "Placemark: " + rows.length + "\n" +
+    "Kolom: " + headers.length + "\n" +
+    "Output: " + outputFileName
+  );
+}
+
+function log(msg) {
+  document.getElementById("log").textContent = msg;
+}
+</script>
+
+</body>
+</html>
